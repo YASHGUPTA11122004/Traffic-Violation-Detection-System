@@ -1,0 +1,27 @@
+# Virtual Environment
+venv/
+
+# Model weights (too large)
+models/
+yolov8n.pt
+yolo26n.pt
+
+# Datasets (too large)
+datasets/
+
+# Output files
+output/
+
+# Videos
+videos/
+
+# Database
+database/violations.db
+
+# Cache
+__pycache__/
+*.pyc
+.ultralytics/
+
+# Temp files
+*.tmp

@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Violation Detection System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Segoe UI',sans-serif; background:#f0f2f5; color:#1a237e; font-size:13px; }
+
+        /* Header */
+        .header {
+            background:linear-gradient(135deg,#1a237e,#283593);
+            padding:12px 32px; display:flex;
+            align-items:center; justify-content:space-between;
+            border-bottom:3px solid #ff9800;
+        }
+        .header-title { text-align:center; flex:1; }
+        .header h1 { font-size:20px; letter-spacing:2px; color:#fff; font-weight:700; }
+        .header p  { color:rgba(255,255,255,0.65); font-size:11px; margin-top:2px; }
+        .header span { color:#ff9800; font-size:10px; }
+        .header-side { width:160px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
+
+        .auto-refresh { display:flex; align-items:center; gap:5px; font-size:11px; color:rgba(255,255,255,0.6); }
+        .pulse { width:7px; height:7px; background:#66bb6a; border-radius:50%; animation:pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.5;transform:scale(1.4);} }
+
+        .notif-btn {
+            position:relative; background:rgba(255,255,255,0.15);
+            border:1px solid rgba(255,255,255,0.3); color:#fff;
+            padding:5px 10px; border-radius:16px; cursor:pointer; font-size:13px;
+        }
+        .notif-badge {
+            position:absolute; top:-4px; right:-4px;
+            background:#ef5350; color:white; font-size:9px; font-weight:700;
+            width:16px; height:16px; border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+        }
+
+        /* Tabs */
+        .tabs {
+            display:flex; background:#1a237e; padding:0 32px;
+            border-bottom:1px solid #e0e0e0;
+        }
+        .tab-btn {
+            padding:11px 24px; color:rgba(255,255,255,0.55);
+            cursor:pointer; font-size:13px; font-weight:600;
+            border:none; background:none;
+            border-bottom:3px solid transparent; transition:all 0.25s;
+            font-family:'Segoe UI',sans-serif;
+        }
+        .tab-btn:hover { color:#fff; }
+        .tab-btn.active { color:#ff9800; border-bottom:3px solid #ff9800; }
+
+        .tab-content { display:none; padding:16px 32px; }
+        .tab-content.active { display:block; }
+
+        .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+        /* Cards */
+        .card {
+            background:#fff; border-radius:10px; padding:16px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.08); margin-bottom:12px;
+            border:1px solid #e8eaf6;
+        }
+        .card h3 {
+            font-size:13px; font-weight:700; color:#1a237e;
+            margin-bottom:12px; border-bottom:2px solid #e8eaf6;
+            padding-bottom:8px; letter-spacing:0.3px;
+        }
+
+        /* Upload */
+        .upload-area {
+            border:2px dashed #c5cae9; border-radius:8px;
+            padding:28px; text-align:center; cursor:pointer;
+            transition:all 0.25s; background:#f8f9ff;
+        }
+        .upload-area:hover { border-color:#3949ab; background:#e8eaf6; }
+        .upload-icon { font-size:34px; }
+        .upload-area p { color:#666; margin-top:6px; font-size:12px; }
+
+        .btn-detect {
+            width:100%; padding:11px; border:none; border-radius:8px;
+            font-size:13px; font-weight:700; cursor:pointer; margin-top:12px;
+            background:linear-gradient(135deg,#3949ab,#1a237e);
+            color:white; box-shadow:0 3px 12px rgba(57,73,171,0.3);
+            transition:all 0.25s; letter-spacing:0.5px;
+        }
+        .btn-detect:hover { transform:translateY(-1px); box-shadow:0 5px 16px rgba(57,73,171,0.4); }
+        .btn-detect:disabled { background:#bdbdbd; cursor:not-allowed; transform:none; box-shadow:none; }
+
+        #result-image, #output-video { width:100%; border-radius:8px; display:none; margin-top:8px; }
+
+        .report-box {
+            background:#f8f9ff; border-radius:8px; padding:12px;
+            font-size:12px; min-height:100px; border:1px solid #e8eaf6;
+            white-space:pre-line; line-height:1.9; color:#333;
+            margin-top:8px; font-family:'Consolas',monospace;
+        }
+        .fine-total {
+            background:#fff8e1; border:1px solid #ffcc02; border-radius:8px;
+            padding:10px; font-size:15px; font-weight:700;
+            color:#e65100; text-align:center; margin-top:8px; display:none;
+        }
+        .challan-info {
+            background:#e8f5e9; border:1px solid #a5d6a7; border-radius:8px;
+            padding:10px; margin-top:8px; display:none; font-size:12px;
+        }
+
+        .loading { display:none; text-align:center; padding:16px; color:#666; }
+        .spinner {
+            border:3px solid #e8eaf6; border-top:3px solid #3949ab;
+            border-radius:50%; width:30px; height:30px;
+            animation:spin 0.8s linear infinite; margin:0 auto 8px;
+        }
+        @keyframes spin { 100%{ transform:rotate(360deg); } }
+
+        /* Stats */
+        .stats-grid {
+            display:grid; grid-template-columns:repeat(8,1fr);
+            gap:10px; margin-bottom:12px;
+        }
+        .stat-card {
+            background:#fff; border-radius:10px; padding:12px 8px;
+            text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.07);
+            border:1px solid #e8eaf6; border-top:3px solid var(--sc, #3949ab);
+        }
+        .stat-value { font-size:20px; font-weight:700; color:var(--sc,#3949ab); line-height:1.2; }
+        .stat-label { font-size:9px; color:#888; text-transform:uppercase; letter-spacing:0.8px; margin-top:3px; font-weight:600; }
+
+        /* Controls */
+        .controls { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
+        .search-box {
+            flex:1; padding:8px 14px; border:1px solid #c5cae9;
+            border-radius:20px; font-size:12px; color:#333;
+            outline:none; min-width:180px; background:#fff;
+        }
+        .search-box:focus { border-color:#3949ab; }
+        .filter-select {
+            padding:8px 12px; border:1px solid #c5cae9;
+            border-radius:20px; font-size:12px; color:#333;
+            background:#fff; outline:none; cursor:pointer;
+        }
+        .btn-sm {
+            padding:7px 14px; border:none; border-radius:16px;
+            cursor:pointer; font-size:11px; font-weight:700; transition:all 0.2s;
+        }
+        .btn-blue   { background:#e8eaf6; color:#3949ab; border:1px solid #c5cae9; }
+        .btn-green  { background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; }
+        .btn-orange { background:#fff8e1; color:#e65100; border:1px solid #ffcc80; }
+        .btn-red    { background:#ffebee; color:#c62828; border:1px solid #ef9a9a; }
+        .btn-sm:hover { filter:brightness(0.95); transform:scale(1.03); }
+
+        /* Table */
+        .table-wrap { overflow-x:auto; max-height:360px; overflow-y:auto; }
+        table { width:100%; border-collapse:collapse; font-size:12px; }
+        th {
+            background:#1a237e; color:#fff;
+            padding:10px 8px; text-align:left; font-size:10px;
+            text-transform:uppercase; letter-spacing:0.8px;
+            position:sticky; top:0; z-index:2; font-weight:700;
+        }
+        td { padding:9px 8px; border-bottom:1px solid #f0f2f5; vertical-align:middle; color:#333; }
+        tr:hover td { background:#f8f9ff; }
+        tr:nth-child(even) td { background:#fafafa; }
+        tr:nth-child(even):hover td { background:#f0f2f5; }
+
+        .badge {
+            display:inline-block; padding:3px 10px; border-radius:12px;
+            font-size:10px; font-weight:700; letter-spacing:0.3px;
+        }
+        .badge-unpaid { background:#ffebee; color:#c62828; border:1px solid #ef9a9a; }
+        .badge-paid   { background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; }
+        .badge-waived { background:#e3f2fd; color:#1565c0; border:1px solid #90caf9; }
+
+        .action-btns { display:flex; gap:4px; }
+        .btn-icon {
+            padding:4px 9px; border:none; border-radius:10px;
+            cursor:pointer; font-size:11px; font-weight:700; transition:all 0.2s;
+        }
+        .btn-icon:hover { transform:scale(1.08); }
+        .bi-edit   { background:#e8eaf6; color:#3949ab; border:1px solid #c5cae9; }
+        .bi-pdf    { background:#fff8e1; color:#e65100; border:1px solid #ffcc80; }
+        .bi-delete { background:#ffebee; color:#c62828; border:1px solid #ef9a9a; }
+
+        /* Modal */
+        .modal-overlay {
+            display:none; position:fixed; top:0; left:0;
+            width:100%; height:100%; background:rgba(0,0,0,0.45);
+            z-index:1000; align-items:center; justify-content:center;
+        }
+        .modal-overlay.active { display:flex; }
+        .modal {
+            background:#fff; border-radius:14px; padding:24px;
+            width:420px; max-width:95%;
+            box-shadow:0 16px 48px rgba(0,0,0,0.18);
+            border:1px solid #e8eaf6;
+        }
+        .modal h3 { color:#1a237e; margin-bottom:16px; font-size:15px; font-weight:700; }
+        .modal label {
+            display:block; font-size:10px; color:#888;
+            margin:10px 0 3px; text-transform:uppercase;
+            letter-spacing:0.8px; font-weight:700;
+        }
+        .modal select, .modal textarea {
+            width:100%; padding:9px 12px;
+            border:1px solid #c5cae9; border-radius:8px;
+            font-size:13px; color:#333; outline:none; background:#fff;
+        }
+        .modal select:focus, .modal textarea:focus { border-color:#3949ab; }
+        .modal textarea { height:70px; resize:vertical; font-family:'Segoe UI',sans-serif; }
+        .modal-btns { display:flex; gap:8px; margin-top:16px; justify-content:flex-end; }
+        .btn-cancel { background:#f5f5f5; color:#666; border:1px solid #ddd; }
+
+        /* Chart Toggle Button */
+        .chart-toggle-fab {
+            position:fixed; bottom:24px; right:24px; z-index:100;
+            width:48px; height:48px; border-radius:50%;
+            background:linear-gradient(135deg,#3949ab,#1a237e);
+            color:white; border:none; cursor:pointer;
+            font-size:20px; box-shadow:0 4px 16px rgba(57,73,171,0.4);
+            transition:all 0.3s; display:flex; align-items:center; justify-content:center;
+        }
+        .chart-toggle-fab:hover { transform:scale(1.1); box-shadow:0 6px 20px rgba(57,73,171,0.5); }
+
+        /* Charts Panel */
+        .charts-panel {
+            display:none; position:fixed; bottom:84px; right:24px;
+            width:700px; z-index:99;
+            background:#fff; border-radius:14px;
+            box-shadow:0 8px 32px rgba(0,0,0,0.15);
+            border:1px solid #e8eaf6; padding:16px;
+            animation:slideUp 0.25s ease;
+        }
+        .charts-panel.open { display:block; }
+        @keyframes slideUp { from{opacity:0;transform:translateY(20px);} to{opacity:1;transform:translateY(0);} }
+        .charts-panel-header {
+            display:flex; justify-content:space-between; align-items:center;
+            margin-bottom:14px; padding-bottom:10px; border-bottom:2px solid #e8eaf6;
+        }
+        .charts-panel-header h3 { font-size:13px; color:#1a237e; font-weight:700; }
+        .charts-close {
+            background:#ffebee; border:1px solid #ef9a9a; color:#c62828;
+            width:26px; height:26px; border-radius:50%;
+            cursor:pointer; font-size:14px; font-weight:700;
+            display:flex; align-items:center; justify-content:center;
+        }
+        .charts-close:hover { background:#ef5350; color:#fff; }
+        .charts-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+        .chart-box h4 { font-size:11px; font-weight:700; color:#333; margin-bottom:8px; }
+
+        .empty-msg { text-align:center; color:#999; padding:24px; font-size:13px; }
+
+        ::-webkit-scrollbar { width:5px; }
+        ::-webkit-scrollbar-track { background:#f5f5f5; }
+        ::-webkit-scrollbar-thumb { background:#c5cae9; border-radius:3px; }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div style="width:160px">
+        <div class="auto-refresh">
+            <div class="pulse"></div>
+            <span id="refresh-timer" style="color:rgba(255,255,255,0.6)">30s</span>
+        </div>
+    </div>
+    <div class="header-title">
+        <h1>🚔 TRAFFIC POLICE DEPARTMENT</h1>
+        <p>AI-Powered Traffic Violation Detection & E-Challan Management System</p>
+        <span>REAL-TIME MONITORING | AUTOMATED CHALLAN GENERATION</span>
+    </div>
+    <div class="header-side">
+        <button class="notif-btn" onclick="showTab('dashboard',null)">
+            🔔<span class="notif-badge" id="notif-count">0</span>
+        </button>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+    <button class="tab-btn active" onclick="showTab('image',this)">📷 Image Detection</button>
+    <button class="tab-btn" onclick="showTab('video',this)">🎥 Video Detection</button>
+    <button class="tab-btn" onclick="showTab('dashboard',this)">📊 Dashboard</button>
+</div>
+
+<!-- IMAGE TAB -->
+<div id="tab-image" class="tab-content active">
+    <div class="grid-2">
+        <div class="card">
+            <h3>📤 Upload Traffic Image</h3>
+            <div class="upload-area" onclick="document.getElementById('img-input').click()">
+                <div class="upload-icon">🖼️</div>
+                <p>Click karo ya drag & drop</p>
+                <p style="color:#bbb">JPG, PNG, JPEG</p>
+            </div>
+            <input type="file" id="img-input" accept="image/*" style="display:none" onchange="previewImage(this)">
+            <img id="preview-img" style="width:100%;margin-top:10px;border-radius:8px;display:none;">
+            <button class="btn-detect" onclick="detectImage()" id="img-btn">🔍 Detect Violations</button>
+        </div>
+        <div class="card">
+            <h3>📊 Detection Result</h3>
+            <div class="loading" id="img-loading"><div class="spinner"></div><p>AI detecting...</p></div>
+            <img id="result-image" alt="Result">
+            <div id="img-report" class="report-box">Result yahan dikhega...</div>
+            <div class="fine-total" id="fine-total"></div>
+            <div class="challan-info" id="challan-info">
+                <strong>📄 Challan Generated!</strong>
+                <span id="challan-id-text" style="margin-left:6px;color:#555"></span>
+                <button class="btn-icon bi-pdf" onclick="downloadPDF()" style="margin-left:8px">⬇️ PDF</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- VIDEO TAB -->
+<div id="tab-video" class="tab-content">
+    <div class="grid-2">
+        <div class="card">
+            <h3>📤 Upload Traffic Video</h3>
+            <div class="upload-area" onclick="document.getElementById('vid-input').click()">
+                <div class="upload-icon">🎬</div>
+                <p>Click karo ya drag & drop</p>
+                <p style="color:#bbb">MP4, AVI</p>
+            </div>
+            <input type="file" id="vid-input" accept="video/*" style="display:none" onchange="previewVideo(this)">
+            <video id="preview-video" controls style="width:100%;margin-top:10px;border-radius:8px;display:none;"></video>
+            <button class="btn-detect" onclick="detectVideo()" id="vid-btn">🔍 Detect Violations</button>
+            <div style="margin-top:10px;padding:10px;background:#f8f9ff;border-radius:8px;font-size:11px;color:#666;line-height:2;border:1px solid #e8eaf6;">
+                <strong style="color:#1a237e">Detects:</strong>
+                🚗 Vehicles &nbsp;⛑️ Helmet &nbsp;🪑 Seatbelt &nbsp;👥 Triple Riding &nbsp;🔢 Plate &nbsp;⚡ Speed &nbsp;🔴 Red Light &nbsp;↩️ Wrong Way &nbsp;🅿️ No Parking
+            </div>
+        </div>
+        <div class="card">
+            <h3>📊 Video Result</h3>
+            <div class="loading" id="vid-loading"><div class="spinner"></div><p>Processing...</p></div>
+            <video id="output-video" controls></video>
+            <div id="vid-report" class="report-box" style="margin-top:10px">Result yahan dikhega...</div>
+        </div>
+    </div>
+</div>
+
+<!-- DASHBOARD TAB -->
+<div id="tab-dashboard" class="tab-content">
+
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card" style="--sc:#3949ab">
+            <div class="stat-value" id="s-total">-</div>
+            <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-card" style="--sc:#c62828">
+            <div class="stat-value" id="s-unpaid">-</div>
+            <div class="stat-label">Unpaid</div>
+        </div>
+        <div class="stat-card" style="--sc:#2e7d32">
+            <div class="stat-value" id="s-paid">-</div>
+            <div class="stat-label">Paid</div>
+        </div>
+        <div class="stat-card" style="--sc:#1565c0">
+            <div class="stat-value" id="s-waived">-</div>
+            <div class="stat-label">Waived</div>
+        </div>
+        <div class="stat-card" style="--sc:#e65100">
+            <div class="stat-value" id="s-total-fine" style="font-size:14px">-</div>
+            <div class="stat-label">Total Fine</div>
+        </div>
+        <div class="stat-card" style="--sc:#c62828">
+            <div class="stat-value" id="s-pending" style="font-size:14px">-</div>
+            <div class="stat-label">Pending</div>
+        </div>
+        <div class="stat-card" style="--sc:#2e7d32">
+            <div class="stat-value" id="s-collected" style="font-size:14px">-</div>
+            <div class="stat-label">Collected</div>
+        </div>
+        <div class="stat-card" style="display:flex;flex-direction:column;gap:6px;justify-content:center;padding:10px;">
+            <button class="btn-sm btn-blue" onclick="loadDashboard()">🔄 Refresh</button>
+            <button class="btn-sm btn-green" onclick="exportCSV()">📥 CSV</button>
+            <button class="btn-sm btn-orange" onclick="window.print()">🖨️ Print</button>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <input class="search-box" id="search-input" type="text"
+               placeholder="🔍 Search vehicle number or challan ID..."
+               oninput="searchChallans()">
+        <select class="filter-select" id="filter-select" onchange="searchChallans()">
+            <option value="ALL">All Status</option>
+            <option value="UNPAID">❌ Unpaid</option>
+            <option value="PAID">✅ Paid</option>
+            <option value="WAIVED">🔵 Waived</option>
+        </select>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Challan ID</th>
+                        <th>Vehicle No.</th>
+                        <th>Violation</th>
+                        <th>Fine</th>
+                        <th>Date & Time</th>
+                        <th>Status</th>
+                        <th>Payment</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="challan-table">
+                    <tr><td colspan="8" class="empty-msg">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Chart FAB Button -->
+<button class="chart-toggle-fab" onclick="toggleCharts()" id="chart-fab" title="Charts dekho">
+    📊
+</button>
+
+<!-- Charts Panel -->
+<div class="charts-panel" id="charts-panel">
+    <div class="charts-panel-header">
+        <h3>📊 Analytics Charts</h3>
+        <button class="charts-close" onclick="toggleCharts()">✕</button>
+    </div>
+    <div class="charts-row">
+        <div class="chart-box">
+            <h4>Violations by Type</h4>
+            <canvas id="violation-chart" height="160"></canvas>
+        </div>
+        <div class="chart-box">
+            <h4>Payment Status</h4>
+            <canvas id="payment-chart" height="160"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="update-modal">
+    <div class="modal">
+        <h3>✏️ Update Challan Status</h3>
+        <input type="hidden" id="modal-challan-id">
+        <label>Status</label>
+        <select id="modal-status" onchange="togglePaymentMode()">
+            <option value="UNPAID">❌ Unpaid</option>
+            <option value="PAID">✅ Paid</option>
+            <option value="WAIVED">🔵 Waived (Maaf)</option>
+        </select>
+        <div id="payment-mode-div" style="display:none">
+            <label>Payment Mode</label>
+            <select id="modal-payment-mode">
+                <option value="">-- Select --</option>
+                <option value="Cash">💵 Cash</option>
+                <option value="Online">💻 Online</option>
+                <option value="UPI">📱 UPI</option>
+                <option value="Cheque">🏦 Cheque</option>
+            </select>
+        </div>
+        <label>Remarks</label>
+        <textarea id="modal-remarks" placeholder="Koi note likhein..."></textarea>
+        <div class="modal-btns">
+            <button class="btn-sm btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="btn-sm btn-blue" onclick="saveUpdate()">✅ Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentChallanId = null;
+    let violationChart = null;
+    let paymentChart   = null;
+    let autoRefreshTimer = 30;
+    let chartsOpen = false;
+    let lastDashData = null;
+
+    // Auto refresh
+    setInterval(() => {
+        autoRefreshTimer--;
+        document.getElementById('refresh-timer').textContent = autoRefreshTimer + 's';
+        if (autoRefreshTimer <= 0) { autoRefreshTimer = 30; loadDashboard(); }
+    }, 1000);
+
+    function showTab(tab, btn) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+        if (btn) btn.classList.add('active');
+        // Show FAB only on dashboard
+        document.getElementById('chart-fab').style.display =
+            tab === 'dashboard' ? 'flex' : 'none';
+        if (tab === 'dashboard') loadDashboard();
+        else { document.getElementById('charts-panel').classList.remove('open'); chartsOpen = false; }
+    }
+
+    function toggleCharts() {
+        chartsOpen = !chartsOpen;
+        document.getElementById('charts-panel').classList.toggle('open', chartsOpen);
+        document.getElementById('chart-fab').textContent = chartsOpen ? '✕' : '📊';
+        if (chartsOpen && lastDashData) renderCharts(lastDashData);
+    }
+
+    function previewImage(input) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = document.getElementById('preview-img');
+            img.src = e.target.result; img.style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+
+    function previewVideo(input) {
+        const v = document.getElementById('preview-video');
+        v.src = URL.createObjectURL(input.files[0]); v.style.display = 'block';
+    }
+
+    async function detectImage() {
+        const input = document.getElementById('img-input');
+        if (!input.files[0]) { alert('Image upload karo!'); return; }
+        document.getElementById('img-loading').style.display = 'block';
+        document.getElementById('img-btn').disabled = true;
+        document.getElementById('result-image').style.display = 'none';
+        document.getElementById('challan-info').style.display = 'none';
+        document.getElementById('fine-total').style.display = 'none';
+        const fd = new FormData();
+        fd.append('image', input.files[0]);
+        try {
+            const res = await fetch('/detect_image', { method:'POST', body:fd });
+            const data = await res.json();
+            if (data.error) { document.getElementById('img-report').textContent = '❌ ' + data.error; return; }
+            const img = document.getElementById('result-image');
+            img.src = 'data:image/jpeg;base64,' + data.image; img.style.display = 'block';
+            let r = `🚗 Vehicles:     ${data.vehicles}\n`;
+            r += `👤 Persons:      ${data.persons}\n`;
+            r += `🔢 Number Plate: ${data.plate || 'Not detected'}\n`;
+            r += `🏍️  Types:        ${(data.vehicle_types||[]).join(', ')||'None'}\n`;
+            document.getElementById('img-report').textContent = r;
+            document.getElementById('fine-total').style.display = 'none';
+            document.getElementById('challan-info').style.display = 'none';
+        } catch(e) { document.getElementById('img-report').textContent = '❌ ' + e.message; }
+        document.getElementById('img-loading').style.display = 'none';
+        document.getElementById('img-btn').disabled = false;
+    }
+
+    async function detectVideo() {
+        const input = document.getElementById('vid-input');
+        if (!input.files[0]) { alert('Video upload karo!'); return; }
+        document.getElementById('vid-loading').style.display = 'block';
+        document.getElementById('vid-btn').disabled = true;
+        document.getElementById('output-video').style.display = 'none';
+        document.getElementById('vid-report').textContent = 'Processing...';
+        const fd = new FormData();
+        fd.append('video', input.files[0]);
+        try {
+            const res = await fetch('/detect_video', { method:'POST', body:fd });
+            const data = await res.json();
+            if (data.error) { document.getElementById('vid-report').textContent = '❌ ' + data.error; return; }
+            const vid = document.getElementById('output-video');
+            vid.src = '/output_video?t=' + Date.now(); vid.style.display = 'block';
+            let r = `📹 Frames:      ${data.frames}\n`;
+            r += `🔢 Plates:      ${data.plates.join(', ')||'None'}\n`;
+            r += `🚨 Violations:  ${data.total_violations}\n`;
+            r += `📄 Challans:    ${data.challans}\n\n`;
+            if (data.violations.length > 0) {
+                r += 'Violations:\n';
+                data.violations.forEach(v => r += `  ❌ ${v.desc} → ₹${v.fine}\n`);
+            } else { r += '✅ No Violations!'; }
+            document.getElementById('vid-report').textContent = r;
+        } catch(e) { document.getElementById('vid-report').textContent = '❌ ' + e.message; }
+        document.getElementById('vid-loading').style.display = 'none';
+        document.getElementById('vid-btn').disabled = false;
+    }
+
+    function downloadPDF() {
+        if (currentChallanId) window.open('/download_pdf/' + currentChallanId, '_blank');
+    }
+
+    async function loadDashboard() {
+        autoRefreshTimer = 30;
+        try {
+            const res = await fetch('/dashboard_data');
+            const data = await res.json();
+            lastDashData = data;
+            document.getElementById('s-total').textContent     = data.total;
+            document.getElementById('s-unpaid').textContent    = data.unpaid;
+            document.getElementById('s-paid').textContent      = data.paid;
+            document.getElementById('s-waived').textContent    = data.waived;
+            document.getElementById('s-total-fine').textContent= '₹'+(data.total_fine||0).toLocaleString();
+            document.getElementById('s-pending').textContent   = '₹'+(data.pending||0).toLocaleString();
+            document.getElementById('s-collected').textContent = '₹'+(data.collected||0).toLocaleString();
+            document.getElementById('notif-count').textContent = data.unpaid;
+            renderTable(data.challans);
+            if (chartsOpen) renderCharts(data);
+        } catch(e) { console.error(e); }
+    }
+
+    function renderCharts(data) {
+        const vCounts = {};
+        (data.challans||[]).forEach(c => {
+            c.violation.split(',').forEach(v => {
+                const k = v.trim().split('(')[0].trim();
+                vCounts[k] = (vCounts[k]||0) + 1;
+            });
+        });
+        const vCtx = document.getElementById('violation-chart').getContext('2d');
+        if (violationChart) violationChart.destroy();
+        violationChart = new Chart(vCtx, {
+            type:'doughnut',
+            data:{
+                labels:Object.keys(vCounts),
+                datasets:[{ data:Object.values(vCounts),
+                    backgroundColor:['#ef5350','#ff9800','#ffee58','#66bb6a','#26c6da','#5c6bc0','#ab47bc'],
+                    borderWidth:2, borderColor:'#fff' }]
+            },
+            options:{
+                plugins:{ legend:{ labels:{ color:'#333', font:{size:11}, boxWidth:12 }, position:'right' } },
+                cutout:'55%'
+            }
+        });
+        const pCtx = document.getElementById('payment-chart').getContext('2d');
+        if (paymentChart) paymentChart.destroy();
+        paymentChart = new Chart(pCtx, {
+            type:'bar',
+            data:{
+                labels:['Unpaid','Paid','Waived'],
+                datasets:[{ data:[data.unpaid,data.paid,data.waived],
+                    backgroundColor:['rgba(239,83,80,0.8)','rgba(102,187,106,0.8)','rgba(38,198,218,0.8)'],
+                    borderRadius:6, borderWidth:0 }]
+            },
+            options:{
+                plugins:{ legend:{display:false} },
+                scales:{
+                    y:{ ticks:{color:'#666',font:{size:10}}, grid:{color:'rgba(0,0,0,0.05)'} },
+                    x:{ ticks:{color:'#666',font:{size:10}}, grid:{display:false} }
+                }
+            }
+        });
+    }
+
+    async function searchChallans() {
+        const q = document.getElementById('search-input').value;
+        const s = document.getElementById('filter-select').value;
+        const res = await fetch(`/search_challans?q=${encodeURIComponent(q)}&status=${s}`);
+        const data = await res.json();
+        renderTable(data.challans);
+    }
+
+    function renderTable(challans) {
+        const tbody = document.getElementById('challan-table');
+        if (!challans || challans.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-msg">Koi challan nahi mila!</td></tr>';
+            return;
+        }
+        tbody.innerHTML = challans.map(c => {
+            const bc = c.status==='PAID'?'badge-paid':c.status==='WAIVED'?'badge-waived':'badge-unpaid';
+            const si = c.status==='PAID'?'✅':c.status==='WAIVED'?'🔵':'❌';
+            const pm = c.payment_mode ?
+                `<span style="font-size:11px;font-weight:600;color:#333">${c.payment_mode}</span>` :
+                `<span style="color:#ccc">—</span>`;
+            return `<tr>
+                <td style="font-size:10px;color:#999;font-family:monospace">${c.id.substring(0,16)}...</td>
+                <td><strong style="font-size:12px;color:#1a237e">${c.vehicle}</strong></td>
+                <td style="max-width:160px;font-size:11px;color:#555">${c.violation}</td>
+                <td><strong style="color:#e65100;font-size:12px">₹${c.fine}</strong></td>
+                <td style="font-size:11px;color:#777">${c.time}</td>
+                <td><span class="badge ${bc}">${si} ${c.status}</span></td>
+                <td>${pm}${c.payment_date?`<br><span style="font-size:10px;color:#bbb">${c.payment_date}</span>`:''}</td>
+                <td>
+                    <div class="action-btns">
+                        <button class="btn-icon bi-edit" title="Update" onclick="openModal('${c.id}','${c.status}','${c.payment_mode||''}','${(c.remarks||'').replace(/'/g,'')}')">✏️</button>
+                        <button class="btn-icon bi-pdf" title="PDF" onclick="window.open('/download_pdf/${c.id}','_blank')">📄</button>
+                        <button class="btn-icon bi-delete" title="Delete" onclick="deleteChallan('${c.id}')">🗑️</button>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function openModal(id, status, payMode, remarks) {
+        document.getElementById('modal-challan-id').value   = id;
+        document.getElementById('modal-status').value       = status;
+        document.getElementById('modal-payment-mode').value = payMode||'';
+        document.getElementById('modal-remarks').value      = remarks||'';
+        togglePaymentMode();
+        document.getElementById('update-modal').classList.add('active');
+    }
+    function closeModal() { document.getElementById('update-modal').classList.remove('active'); }
+    function togglePaymentMode() {
+        document.getElementById('payment-mode-div').style.display =
+            document.getElementById('modal-status').value==='PAID' ? 'block' : 'none';
+    }
+    async function saveUpdate() {
+        await fetch('/update_challan', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+                challan_id:   document.getElementById('modal-challan-id').value,
+                status:       document.getElementById('modal-status').value,
+                payment_mode: document.getElementById('modal-payment-mode').value,
+                remarks:      document.getElementById('modal-remarks').value
+            })
+        });
+        closeModal(); loadDashboard();
+    }
+    async function deleteChallan(id) {
+        if (!confirm('Delete karna chahte ho?')) return;
+        await fetch('/delete_challan/'+id, {method:'DELETE'});
+        loadDashboard();
+    }
+    function exportCSV() { window.open('/export_csv','_blank'); }
+
+    // Init — hide FAB until dashboard
+    document.getElementById('chart-fab').style.display = 'none';
+    loadDashboard();
+</script>
+</body>
+</html>
